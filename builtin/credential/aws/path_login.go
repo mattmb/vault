@@ -4,6 +4,7 @@ import (
 	"crypto/subtle"
 	"crypto/x509"
 	"encoding/base64"
+	"encoding/json"
 	"encoding/pem"
 	"encoding/xml"
 	"fmt"
@@ -1464,7 +1465,14 @@ func parseIamRequestHeaders(headersB64 string) (http.Header, error) {
 		return nil, fmt.Errorf("failed to base64 decode iam_request_headers")
 	}
 	var headersDecoded map[string]interface{}
-	err = jsonutil.DecodeJSON(headersJson, &headersDecoded)
+	// Don't use jsonutil here. For standardization reasons jsonutil uses
+	// json.UseNumber which in most cases is good, but several of the
+	// implementations of the AWS SDK generate a content length as an int
+	// instead of explicitly as a string. In HTTP requests this is not a
+	// problem since headers are always strings, but since we are
+	// JSON-decoding, this will trip UseNumber and end up decoding into a
+	// json.Number instead of a string, causing a panic.
+	err = json.Unmarshal(headersJson, &headersDecoded)
 	if err != nil {
 		return nil, fmt.Errorf("failed to JSON decode iam_request_headers %q: %v", headersJson, err)
 	}
